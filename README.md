@@ -1,7 +1,7 @@
-## Goal
+## My Dev Setup - Ubuntu
 
 ### What is this ?
-a repo to recreate my dev workflow on any ubuntu based machine
+a repo to recreate my dev workflow on any ubuntu based machine in 20 mins
 
 
 ### How does it work ?

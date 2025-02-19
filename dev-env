@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -e # Exit immediately if a command exits with a non-zero status.
+
+dry_run="0"
+
+if [ -z "$XDG_CONFIG_HOME" ]; then
+    echo "XDG_CONFIG_HOME not set, using ~/.config"
+    XDG_CONFIG_HOME="$HOME/.config"
+fi
+
+if [ -z "$DEV_ENV" ]; then
+    echo "Error: Environment variable DEV_ENV needs to be set."
+    exit 1
+fi
+
+if [[ "$1" == "--dry" ]]; then
+    dry_run="1"
+fi
+
+log() {
+    if [[ "$dry_run" == "1" ]]; then
+        echo "[DRY_RUN]: $1"
+    else
+        echo "$1"
+    fi
+}
+
+update_files() {
+    local source_dir="$1"
+    local dest_dir="$2"
+
+    log "Merging files from: $source_dir into $dest_dir"
+
+    if [[ ! -d "$source_dir" ]]; then
+        log "Error: Source directory \"$source_dir\" does not exist."
+        return 1
+    fi
+
+    if [[ ! -d "$dest_dir" ]]; then
+        log "Error: Destination directory \"$dest_dir\" does not exist."
+        return 1
+    fi
+
+    pushd "$source_dir" &> /dev/null
+    (
+        find . -type f -print0 | while IFS= read -r -d $'\0' file; do
+            local dest_file="$dest_dir/${file#./}"
+            log "  Copying: \"$file\" to \"$dest_file\""
+            if [[ "$dry_run" == "0" ]]; then
+                mkdir -p "$(dirname "$dest_file")"  # Create parent directories if needed
+                cp -p "$file" "$dest_file"          # Copy preserving permissions
+            fi
+        done
+    )
+    popd &> /dev/null
+}
+
+
+copy() {
+    local source_file="$1"
+    local dest_file="$2"
+
+    log "Copying: \"$source_file\" to \"$dest_file\""
+
+    if [[ ! -f "$source_file" ]]; then
+        log "Error: Source file \"$source_file\" does not exist."
+        return 1
+    fi
+
+    log "  Removing: \"$dest_file\""
+    if [[ "$dry_run" == "0" ]]; then
+        rm -f "$dest_file"
+    fi
+
+    log "  Copying: \"$source_file\" to \"$dest_file\""
+    if [[ "$dry_run" == "0" ]]; then
+        if cp -p "$source_file" "$dest_file"; then # Preserve permissions
+            log "    Successfully copied \"$source_file\" to \"$dest_file\""
+        else
+            log "    ERROR: Failed to copy \"$source_file\" to \"$dest_file\""
+        fi
+    fi
+}
+
+# Main execution
+update_files "$DEV_ENV/env/.config" "$XDG_CONFIG_HOME"
+update_files "$DEV_ENV/env/.local" "$HOME/.local"
+
+copy "$DEV_ENV/env/.zsh_profile" "$HOME/.zsh_profile"
+copy "$DEV_ENV/env/.zshrc" "$HOME/.zshrc"
+copy "$DEV_ENV/env/.xprofile" "$HOME/.xprofile"
+copy "$DEV_ENV/env/.tmux-sessionizer" "$HOME/.tmux-sessionizer"
+copy "$DEV_ENV/dev-env" "$HOME/.local/scripts/dev-env"
+
+log "Environment setup complete."
+
